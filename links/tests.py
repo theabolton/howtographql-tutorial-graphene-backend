@@ -25,7 +25,7 @@ from django.test import TestCase
 
 import graphene
 
-from hackernews.schema import Query
+from hackernews.schema import Mutation, Query
 from .models import Link
 
 
@@ -303,5 +303,35 @@ class LinkTests(TestCase):
         }
         schema = graphene.Schema(query=Query)
         result = schema.execute(query)
+        assert not result.errors, result.errors
+        assert result.data == expected, '\n'+repr(expected)+'\n'+repr(result.data)
+
+    def test_create_link(self):
+        query = '''
+          mutation CreateLinkMutation($input: CreateLinkInput!) {
+            createLink(input: $input) {
+              link {
+                url
+                description
+              }
+            }
+          }
+        '''
+        variables = {
+          'input': {
+            'description': 'Description',
+            'url': 'http://example.com',
+          }
+        }
+        expected = {
+          'createLink': {
+            'link': {
+              'description': 'Description',
+              'url': 'http://example.com',
+            }
+          }
+        }
+        schema = graphene.Schema(query=Query, mutation=Mutation)
+        result = schema.execute(query, variable_values=variables)
         assert not result.errors, result.errors
         assert result.data == expected, '\n'+repr(expected)+'\n'+repr(result.data)

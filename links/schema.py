@@ -97,3 +97,42 @@ class Query(object):
 
     def resolve_viewer(self, info):
         return not None # none of the resolvers need Viewer()
+
+
+class CreateLink(relay.ClientIDMutation):
+    # mutation CreateLinkMutation($input: CreateLinkInput!) {
+    #   createLink(input: $input) {
+    #     link {
+    #       id
+    #       createdAt
+    #       url
+    #       description
+    #     }
+    #   }
+    # }
+    # example variables:
+    #   input {
+    #       description: "New Link",
+    #       url: "http://example.com",
+    #       clientMutationId: "",
+    #   }
+
+    link = graphene.Field(Link, required=True)
+
+    class Input:
+        description = graphene.String(required=True)
+        url = graphene.String(required=True)
+
+    @classmethod
+    def mutate_and_get_payload(cls, root, info, url, description):
+        link = LinkModel(
+            url=url,
+            description=description,
+        )
+        link.save()
+
+        return CreateLink(link=link)
+
+
+class Mutation(object):
+    create_link = CreateLink.Field()
