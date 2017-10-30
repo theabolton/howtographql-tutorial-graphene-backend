@@ -1,0 +1,17 @@
+# Use 'pip freeze --local --requirement requirements.txt' to preserve the comments and order!
+
+# These were installed by 'pip install django django-filter'
+Django==1.11.7
+pytz==2017.3
+
+# These were installed by 'pip install graphene graphene-django'
+graphene==2.0
+graphene-django==2.0.0
+graphql-core==2.0
+graphql-relay==0.4.5
+iso8601==0.1.12
+promise==2.1
+Rx==1.6.0
+singledispatch==3.4.0.3
+six==1.11.0
+typing==3.6.2

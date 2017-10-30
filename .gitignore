@@ -1,0 +1,12 @@
+# It is recommended that django migrations NOT be excluded from commits, but
+# that makes no sense when we're excluding the database: 'git checkout <branch>'
+# can replace one but not the other.
+db.sqlite3
+links/migrations/
+users/migrations/
+
+hackernews/__pycache__/
+links/__pycache__/
+users/__pycache__/
+
+README.html
