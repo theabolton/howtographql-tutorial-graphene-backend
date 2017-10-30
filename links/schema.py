@@ -23,7 +23,7 @@
 
 import graphene
 from graphene import ObjectType, relay
-from graphene_django import DjangoConnectionField, DjangoObjectType
+from graphene_django import DjangoObjectType
 
 from links.models import Link as LinkModel
 
@@ -32,13 +32,63 @@ class Link(DjangoObjectType):
     class Meta:
         model = LinkModel
         interfaces = (relay.Node, )
+        # We are going to provide a custom Connection, so we need to tell graphene-django not to
+        # create one. Failing to do this will result in a error like "AssertionError: Found
+        # different types with the same name in the schema: LinkConnection, LinkConnection."
+        use_connection = False
+
+
+class LinkOrderBy(graphene.Enum):
+    """This provides the schema's LinkOrderBy Enum type, for ordering LinkConnection."""
+    createdAt_DESC = '-created_at'
+    createdAt_ASC = 'created_at'
+    description_ASC = 'description'
+    description_DESC = '-description'
+    id_ASC = 'id'
+    id_DESC = '-id'
+    #updatedAt_ASC = 'updated_at'
+    #updatedAt_DESC = '-updated_at'
+    url_ASC = 'url'
+    url_DESC = '-url'
+
+
+class LinkConnection(relay.Connection):
+    """A custom Connection for queries on Link. Using this instead of DjangoConnectionField or
+    DjangoFilterConnectionField solves two problems:
+    - django_filters FilterSet can't use custom enums for OrderFilter choices, and
+    - DjangoConnectionField in graphene-django 2.0 can no longer be given a custom Connection,
+        which makes it difficult to add custom fields (such as the ubiquitous 'totalCount') on the
+        connection without monkey-patching.
+    """
+
+    # total_count = graphene.Int()  -- a custom field on the connection, to be added later
+
+    class Meta:
+        node = Link
+
+    @staticmethod
+    def get_input_fields():
+        return {
+            'order_by': graphene.Argument(LinkOrderBy) # an input field using the custon enum
+        }
+
+    def resolve_all_links(self, info, **args):
+        qs = LinkModel.objects.all()
+        order_by = args.get('order_by')
+        if order_by:
+            qs = qs.order_by(order_by)
+        return qs
 
 
 class Viewer(ObjectType):
     class Meta:
         interfaces = (relay.Node, )
 
-    all_links = DjangoConnectionField(Link)
+    all_links = relay.ConnectionField(
+        LinkConnection,
+        resolver=LinkConnection.resolve_all_links,
+        **LinkConnection.get_input_fields()
+    )
 
 
 class Query(object):
