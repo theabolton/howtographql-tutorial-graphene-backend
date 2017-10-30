@@ -46,11 +46,11 @@ class RootTests(TestCase):
           }
         '''
         expected = {
-          '__schema': {
-            'queryType': {
-              'name': 'Query'
+            '__schema': {
+                'queryType': {
+                    'name': 'Query'
+                }
             }
-          }
         }
         schema = graphene.Schema(query=Query)
         result = schema.execute(query)
@@ -79,29 +79,29 @@ class ViewerTests(TestCase):
           }
         '''
         expected = {
-          '__type': {
-            'name': 'Viewer',
-            'fields': [
-              {
-                'name': 'id',
-                'type': {
-                  'name': None,
-                  'kind': 'NON_NULL',
-                  'ofType': {
-                    'name': 'ID',
-                  }
-                }
-              },
-              {
-                'name': 'allLinks',
-                'type': {
-                  'name': 'LinkConnection',
-                  'kind': 'OBJECT',
-                  'ofType': None,
-                }
-              },
-            ]
-          }
+            '__type': {
+                'name': 'Viewer',
+                'fields': [
+                    {
+                        'name': 'id',
+                        'type': {
+                            'name': None,
+                            'kind': 'NON_NULL',
+                            'ofType': {
+                                'name': 'ID',
+                            }
+                        }
+                    },
+                    {
+                        'name': 'allLinks',
+                        'type': {
+                            'name': 'LinkConnection',
+                            'kind': 'OBJECT',
+                            'ofType': None,
+                        }
+                    },
+                ]
+            }
         }
         schema = graphene.Schema(query=Query)
         result = schema.execute(query)
@@ -156,19 +156,19 @@ class LinkTests(TestCase):
           }
         '''
         expected = {
-          'viewer': {
-            'allLinks': {
-              'edges': [
-                {
-                  'node': {
-                    'id': 'TGluazox',
-                    'description': 'Description',
-                    'url': 'http://',
-                  }
+            'viewer': {
+                'allLinks': {
+                    'edges': [
+                        {
+                            'node': {
+                                'id': 'TGluazox',
+                                'description': 'Description',
+                                'url': 'http://',
+                            }
+                        }
+                    ]
                 }
-              ]
             }
-          }
         }
         schema = graphene.Schema(query=Query)
         result = schema.execute(query)
@@ -192,15 +192,15 @@ class LinkTests(TestCase):
           }
         '''
         expected = {
-          'viewer': {
-            'allLinks': {
-              'edges': [
-                { 'node': { 'url': 'http://b.com' } },
-                { 'node': { 'url': 'http://c.com' } },
-                { 'node': { 'url': 'http://a.com' } },
-              ]
+            'viewer': {
+                'allLinks': {
+                    'edges': [
+                        { 'node': { 'url': 'http://b.com' } },
+                        { 'node': { 'url': 'http://c.com' } },
+                        { 'node': { 'url': 'http://a.com' } },
+                    ]
+                }
             }
-          }
         }
         schema = graphene.Schema(query=Query)
         result = schema.execute(query)
@@ -221,15 +221,15 @@ class LinkTests(TestCase):
           }
         '''
         expected = {
-          'viewer': {
-            'allLinks': {
-              'edges': [
-                { 'node': { 'url': 'http://c.com' } },
-                { 'node': { 'url': 'http://b.com' } },
-                { 'node': { 'url': 'http://a.com' } },
-              ]
+            'viewer': {
+                'allLinks': {
+                    'edges': [
+                        { 'node': { 'url': 'http://c.com' } },
+                        { 'node': { 'url': 'http://b.com' } },
+                        { 'node': { 'url': 'http://a.com' } },
+                    ]
+                }
             }
-          }
         }
         schema = graphene.Schema(query=Query)
         result = schema.execute(query)
@@ -257,17 +257,17 @@ class LinkTests(TestCase):
           }
         '''
         expected = {
-          'viewer': {
-            'allLinks': {
-              'edges': [
-                { 'node': { 'url': 'http://a.com' } },
-                { 'node': { 'url': 'http://b.com' } },
-              ],
-              'pageInfo': {
-                'endCursor': 'REDACTED',
-              }
+            'viewer': {
+                'allLinks': {
+                    'edges': [
+                        { 'node': { 'url': 'http://a.com' } },
+                        { 'node': { 'url': 'http://b.com' } },
+                    ],
+                    'pageInfo': {
+                        'endCursor': 'REDACTED',
+                    }
+                }
             }
-          }
         }
         schema = graphene.Schema(query=Query)
         result = schema.execute(query)
@@ -293,13 +293,13 @@ class LinkTests(TestCase):
           }
         ''')
         expected = {
-          'viewer': {
-            'allLinks': {
-              'edges': [
-                { 'node': { 'url': 'http://c.com' } },
-              ],
+            'viewer': {
+                'allLinks': {
+                    'edges': [
+                        { 'node': { 'url': 'http://c.com' } },
+                    ],
+                }
             }
-          }
         }
         schema = graphene.Schema(query=Query)
         result = schema.execute(query)
@@ -318,18 +318,18 @@ class LinkTests(TestCase):
           }
         '''
         variables = {
-          'input': {
-            'description': 'Description',
-            'url': 'http://example.com',
-          }
+            'input': {
+                'description': 'Description',
+                'url': 'http://example.com',
+            }
         }
         expected = {
-          'createLink': {
-            'link': {
-              'description': 'Description',
-              'url': 'http://example.com',
+            'createLink': {
+                'link': {
+                    'description': 'Description',
+                    'url': 'http://example.com',
+                }
             }
-          }
         }
         schema = graphene.Schema(query=Query, mutation=Mutation)
         result = schema.execute(query, variable_values=variables)
