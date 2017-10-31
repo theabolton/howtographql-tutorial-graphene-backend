@@ -26,7 +26,7 @@ from django.test import TestCase
 import graphene
 
 from hackernews.schema import Mutation, Query
-from .models import Link
+from .models import LinkModel
 
 
 class RootTests(TestCase):
@@ -115,22 +115,22 @@ class ViewerTests(TestCase):
         assert result.data == expected, '\n'+repr(expected)+'\n'+repr(result.data)
 
 
-def create_Links_orderBy_test_data():
+def create_Link_orderBy_test_data():
     """Create test data for LinkConnection orderBy tests. Create three links,
     with description, url, and created_at each having a different sort order."""
     import datetime
     import pytz
     def dt(epoch):
         return datetime.datetime.fromtimestamp(epoch).replace(tzinfo=pytz.utc)
-    link = Link(description='Description C', url='http://a.com')
+    link = LinkModel(description='Description C', url='http://a.com')
     link.save()  # give 'auto_now_add' a chance to do its thing
     link.created_at = dt(1000000000) # new time stamp, least recent
     link.save()
-    link = Link(description='Description B', url='http://b.com')
+    link = LinkModel(description='Description B', url='http://b.com')
     link.save()
     link.created_at = dt(1000000400) # most recent
     link.save()
-    link = Link(description='Description A', url='http://c.com')
+    link = LinkModel(description='Description A', url='http://c.com')
     link.save()
     link.created_at = dt(1000000200)
     link.save()
@@ -138,7 +138,7 @@ def create_Links_orderBy_test_data():
 
 class LinkTests(TestCase):
     def test_all_links(self):
-        link = Link(description='Description', url='http://')
+        link = LinkModel(description='Description', url='http://')
         link.save()
         query = '''
           query AllLinksTest {
@@ -176,7 +176,7 @@ class LinkTests(TestCase):
         assert result.data == expected, '\n'+repr(expected)+'\n'+repr(result.data)
 
     def test_all_links_ordered_by(self):
-        create_Links_orderBy_test_data()
+        create_Link_orderBy_test_data()
         # descending order of creation: b.com, c.com, a.com
         query = '''
           query AllLinksTest {
@@ -238,7 +238,7 @@ class LinkTests(TestCase):
 
     def test_all_links_pagination(self):
         """Make sure that pagination still works on the custom LinkConnection."""
-        create_Links_orderBy_test_data()
+        create_Link_orderBy_test_data()
         # retrieve the first two links, in url order, plus a cursor for the next page
         query = '''
           query AllLinksTest {

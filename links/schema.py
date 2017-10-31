@@ -23,15 +23,16 @@
 
 import graphene
 from graphene import ObjectType, relay
+from graphene.relay import Node
 from graphene_django import DjangoObjectType
 
-from links.models import Link as LinkModel
+from links.models import LinkModel
 
 
 class Link(DjangoObjectType):
     class Meta:
         model = LinkModel
-        interfaces = (relay.Node, )
+        interfaces = (Node, )
         # We are going to provide a custom Connection, so we need to tell graphene-django not to
         # create one. Failing to do this will result in a error like "AssertionError: Found
         # different types with the same name in the schema: LinkConnection, LinkConnection."
@@ -82,7 +83,7 @@ class LinkConnection(relay.Connection):
 
 class Viewer(ObjectType):
     class Meta:
-        interfaces = (relay.Node, )
+        interfaces = (Node, )
 
     all_links = relay.ConnectionField(
         LinkConnection,
@@ -93,7 +94,7 @@ class Viewer(ObjectType):
 
 class Query(object):
     viewer = graphene.Field(Viewer)
-    node = relay.Node.Field()
+    node = Node.Field()
 
     def resolve_viewer(self, info):
         return not None # none of the resolvers need Viewer()
