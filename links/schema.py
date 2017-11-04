@@ -73,7 +73,7 @@ class LinkConnection(relay.Connection):
     @staticmethod
     def get_input_fields():
         return {
-            'order_by': graphene.Argument(LinkOrderBy) # an input field using the custon enum
+            'order_by': graphene.Argument(LinkOrderBy) # an input field using the custom enum
         }
 
     def resolve_all_links(self, info, **args):

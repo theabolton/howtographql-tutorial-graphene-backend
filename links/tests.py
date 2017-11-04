@@ -441,7 +441,7 @@ class CreateLinkTests(TestCase):
         result = self.schema.execute(self.query, variable_values=self.variables(self.user_gid),
                                      context_value=self.context_without_token())
         self.assertIsNotNone(result.errors,
-                             msg='Test should have failed: no auth token, yes postedById')
+                             msg='createLink should have failed: no auth token, yes postedById')
         self.assertIn('Only logged-in users may create links', repr(result.errors))
         expected = { 'createLink': None } # empty result
         self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
@@ -459,7 +459,7 @@ class CreateLinkTests(TestCase):
         result = self.schema.execute(self.query, variable_values=self.variables(' invalid base64 '),
                                      context_value=self.context_with_token())
         self.assertIsNotNone(result.errors,
-                             msg='Test should have failed: mismatched auth token and postedById')
+                             msg='createLink should have failed: mismatched auth token and postedById')
         self.assertIn('postedById does not match user ID', repr(result.errors))
         expected = { 'createLink': None } # empty result
         self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
