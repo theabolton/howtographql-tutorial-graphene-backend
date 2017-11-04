@@ -30,6 +30,8 @@ from links.models import LinkModel
 from users.schema import get_user_from_auth_token
 
 
+# ========== Link ==========
+
 class Link(DjangoObjectType):
     class Meta:
         model = LinkModel
@@ -82,25 +84,6 @@ class LinkConnection(relay.Connection):
         return qs
 
 
-class Viewer(ObjectType):
-    class Meta:
-        interfaces = (Node, )
-
-    all_links = relay.ConnectionField(
-        LinkConnection,
-        resolver=LinkConnection.resolve_all_links,
-        **LinkConnection.get_input_fields()
-    )
-
-
-class Query(object):
-    viewer = graphene.Field(Viewer)
-    node = Node.Field()
-
-    def resolve_viewer(self, info):
-        return not None # none of Viewer's resolvers need Viewer()
-
-
 class CreateLink(relay.ClientIDMutation):
     # mutation CreateLinkMutation($input: CreateLinkInput!) {
     #   createLink(input: $input) {
@@ -151,6 +134,27 @@ class CreateLink(relay.ClientIDMutation):
         link.save()
 
         return CreateLink(link=link)
+
+
+# ========== schema structure ==========
+
+class Viewer(ObjectType):
+    class Meta:
+        interfaces = (Node, )
+
+    all_links = relay.ConnectionField(
+        LinkConnection,
+        resolver=LinkConnection.resolve_all_links,
+        **LinkConnection.get_input_fields()
+    )
+
+
+class Query(object):
+    viewer = graphene.Field(Viewer)
+    node = Node.Field()
+
+    def resolve_viewer(self, info):
+        return not None # none of Viewer's resolvers need Viewer()
 
 
 class Mutation(object):
