@@ -24,10 +24,27 @@
 from django.test import TestCase
 
 import graphene
+from graphene.relay import Node
 
 from hackernews.schema import Mutation, Query
-from .models import LinkModel
+from hackernews.utils import format_graphql_errors, quiet_graphql, unquiet_graphql
+from links.models import LinkModel
+from users.tests import create_test_user
 
+
+# ========== graphql-core exception reporting during tests ==========
+
+# graphql-core (2.0) is rather obnoxious about reporting exceptions, nearly all of which are
+# expected ones, so hush it up during tests. Use format_graphql_errors() to report the information
+# when and where you want.
+def setUpModule():
+    quiet_graphql()
+
+def tearDownModule():
+    unquiet_graphql()
+
+
+# ========== GraphQL schema general tests ==========
 
 class RootTests(TestCase):
     def test_root_query(self):
@@ -54,7 +71,7 @@ class RootTests(TestCase):
         }
         schema = graphene.Schema(query=Query)
         result = schema.execute(query)
-        assert not result.errors, result.errors
+        self.assertIsNone(result.errors, msg=format_graphql_errors(result.errors))
         assert result.data == expected, '\n'+repr(expected)+'\n'+repr(result.data)
 
 
@@ -105,7 +122,7 @@ class ViewerTests(TestCase):
         }
         schema = graphene.Schema(query=Query)
         result = schema.execute(query)
-        assert not result.errors, result.errors
+        self.assertIsNone(result.errors, msg=format_graphql_errors(result.errors))
         # Check that the fields we need are there, but don't fail on extra fields.
         NEEDED_FIELDS = ('id', 'allLinks')
         result.data['__type']['fields'] = list(filter(
@@ -114,6 +131,8 @@ class ViewerTests(TestCase):
         ))
         assert result.data == expected, '\n'+repr(expected)+'\n'+repr(result.data)
 
+
+# ========== allLinks query tests ==========
 
 def create_Link_orderBy_test_data():
     """Create test data for LinkConnection orderBy tests. Create three links,
@@ -172,7 +191,7 @@ class LinkTests(TestCase):
         }
         schema = graphene.Schema(query=Query)
         result = schema.execute(query)
-        assert not result.errors, result.errors
+        self.assertIsNone(result.errors, msg=format_graphql_errors(result.errors))
         assert result.data == expected, '\n'+repr(expected)+'\n'+repr(result.data)
 
     def test_all_links_ordered_by(self):
@@ -204,7 +223,7 @@ class LinkTests(TestCase):
         }
         schema = graphene.Schema(query=Query)
         result = schema.execute(query)
-        assert not result.errors, result.errors
+        self.assertIsNone(result.errors, msg=format_graphql_errors(result.errors))
         assert result.data == expected, '\n'+repr(expected)+'\n'+repr(result.data)
         # ascending order on description: c.com, b.com, a.com
         query = '''
@@ -233,7 +252,7 @@ class LinkTests(TestCase):
         }
         schema = graphene.Schema(query=Query)
         result = schema.execute(query)
-        assert not result.errors, result.errors
+        self.assertIsNone(result.errors, msg=format_graphql_errors(result.errors))
         assert result.data == expected, '\n'+repr(expected)+'\n'+repr(result.data)
 
     def test_all_links_pagination(self):
@@ -271,7 +290,7 @@ class LinkTests(TestCase):
         }
         schema = graphene.Schema(query=Query)
         result = schema.execute(query)
-        assert not result.errors, result.errors
+        self.assertIsNone(result.errors, msg=format_graphql_errors(result.errors))
         # save cursor, and remove it from results (don't depend on cursor representation)
         cursor = result.data['viewer']['allLinks']['pageInfo']['endCursor']
         result.data['viewer']['allLinks']['pageInfo']['endCursor'] = 'REDACTED'
@@ -303,10 +322,15 @@ class LinkTests(TestCase):
         }
         schema = graphene.Schema(query=Query)
         result = schema.execute(query)
-        assert not result.errors, result.errors
+        self.assertIsNone(result.errors, msg=format_graphql_errors(result.errors))
         assert result.data == expected, '\n'+repr(expected)+'\n'+repr(result.data)
 
+
+# ========== createLink mutation tests ==========
+
+class CreateLinkBasicTest(TestCase):
     def test_create_link(self):
+        """Test link creation without user information (for early in the tutorial)."""
         query = '''
           mutation CreateLinkMutation($input: CreateLinkInput!) {
             createLink(input: $input) {
@@ -323,6 +347,8 @@ class LinkTests(TestCase):
                 'url': 'http://example.com',
             }
         }
+        class Context(object):
+            META = {}
         expected = {
             'createLink': {
                 'link': {
@@ -332,6 +358,108 @@ class LinkTests(TestCase):
             }
         }
         schema = graphene.Schema(query=Query, mutation=Mutation)
-        result = schema.execute(query, variable_values=variables)
-        assert not result.errors, result.errors
-        assert result.data == expected, '\n'+repr(expected)+'\n'+repr(result.data)
+        result = schema.execute(query, variable_values=variables, context_value=Context)
+        self.assertIsNone(result.errors, msg=format_graphql_errors(result.errors))
+        self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
+        # check that the link was created properly
+        link = LinkModel.objects.get(description='Description')
+        self.assertEqual(link.description, 'Description')
+        self.assertEqual(link.url, 'http://example.com')
+
+
+class CreateLinkTests(TestCase):
+    def setUp(self):
+        self.user = create_test_user()
+        self.user_gid = Node.to_global_id('User', self.user.pk)
+        self.query = '''
+          mutation CreateLinkMutation($input: CreateLinkInput!) {
+            createLink(input: $input) {
+              link {
+                url
+                description
+                postedBy {
+                  id
+                }
+              }
+            }
+          }
+        '''
+        self.schema = graphene.Schema(query=Query, mutation=Mutation)
+
+    @staticmethod
+    def variables(gid):
+        var = {
+          'input': {
+            'description': 'Description',
+            'url': 'http://example.com',
+          }
+        }
+        if gid:
+            var['input']['postedById'] = gid
+        return var
+
+    def context_with_token(self):
+        class Auth(object):
+            META = {'HTTP_AUTHORIZATION': 'Bearer {}'.format(self.user.token)}
+        return Auth
+
+    @staticmethod
+    def context_without_token():
+        class Auth(object):
+            META = {}
+        return Auth
+
+    def expected(self, with_id=True):
+        return {
+          'createLink': {
+            'link': {
+              'description': 'Description',
+              'url': 'http://example.com',
+              'postedBy': with_id and { 'id': self.user_gid } or None
+            }
+          }
+        }
+
+    def test_create_link_with_user_both(self):
+        """createLink with both user auth token and postedById"""
+        result = self.schema.execute(self.query, variable_values=self.variables(self.user_gid),
+                                     context_value=self.context_with_token())
+        self.assertIsNone(result.errors, msg=format_graphql_errors(result.errors))
+        expected = self.expected()
+        self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
+
+    def test_create_link_with_only_token(self):
+        """createLink with user auth token but not postedById"""
+        result = self.schema.execute(self.query, variable_values=self.variables(None),
+                                     context_value=self.context_with_token())
+        self.assertIsNone(result.errors, msg=format_graphql_errors(result.errors))
+        expected = self.expected()
+        self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
+
+    def test_create_link_with_only_postedById(self):
+        """createLink with postedById but not user auth token, should not succeed"""
+        result = self.schema.execute(self.query, variable_values=self.variables(self.user_gid),
+                                     context_value=self.context_without_token())
+        self.assertIsNotNone(result.errors,
+                             msg='Test should have failed: no auth token, yes postedById')
+        self.assertIn('Only logged-in users may create links', repr(result.errors))
+        expected = { 'createLink': None } # empty result
+        self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
+
+    def test_create_link_with_neither(self):
+        """createLink with neither user auth token nor postedById"""
+        result = self.schema.execute(self.query, variable_values=self.variables(None),
+                                     context_value=self.context_without_token())
+        self.assertIsNone(result.errors, msg=format_graphql_errors(result.errors))
+        expected = self.expected(with_id=False)
+        self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
+
+    def test_create_link_with_mismatch(self):
+        """createLink with mismatched user auth token and postedById, should not succeed"""
+        result = self.schema.execute(self.query, variable_values=self.variables(' invalid base64 '),
+                                     context_value=self.context_with_token())
+        self.assertIsNotNone(result.errors,
+                             msg='Test should have failed: mismatched auth token and postedById')
+        self.assertIn('postedById does not match user ID', repr(result.errors))
+        expected = { 'createLink': None } # empty result
+        self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))

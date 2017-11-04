@@ -27,6 +27,7 @@ from graphene.relay import Node
 from graphene_django import DjangoObjectType
 
 from links.models import LinkModel
+from users.schema import get_user_from_auth_token
 
 
 class Link(DjangoObjectType):
@@ -97,7 +98,7 @@ class Query(object):
     node = Node.Field()
 
     def resolve_viewer(self, info):
-        return not None # none of the resolvers need Viewer()
+        return not None # none of Viewer's resolvers need Viewer()
 
 
 class CreateLink(relay.ClientIDMutation):
@@ -115,6 +116,7 @@ class CreateLink(relay.ClientIDMutation):
     #   input {
     #       description: "New Link",
     #       url: "http://example.com",
+    #       postedById: 1,
     #       clientMutationId: "",
     #   }
 
@@ -123,12 +125,28 @@ class CreateLink(relay.ClientIDMutation):
     class Input:
         description = graphene.String(required=True)
         url = graphene.String(required=True)
+        posted_by_id = graphene.ID()
 
     @classmethod
-    def mutate_and_get_payload(cls, root, info, url, description):
+    def mutate_and_get_payload(cls, root, info, url, description, posted_by_id=None,
+                               client_mutation_id=None):
+        # In order to have this work with early stages of the front-end tutorial, this will allow
+        # links to be created without a user auth token or postedById. If a postedById is present,
+        # then the auth token must be as well. If both are present, then they must agree.
+        user = get_user_from_auth_token(info.context) or None
+        if user or posted_by_id:
+            if not user:
+                raise Exception('Only logged-in users may create links!')
+            if posted_by_id:
+                try:
+                    posted_by_user = Node.get_node_from_global_id(info, posted_by_id)
+                    assert posted_by_user.pk == user.pk
+                except:
+                    raise Exception('postedById does not match user ID!')
         link = LinkModel(
             url=url,
             description=description,
+            posted_by=user,
         )
         link.save()
 
