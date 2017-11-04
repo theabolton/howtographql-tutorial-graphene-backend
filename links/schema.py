@@ -26,8 +26,81 @@ from graphene import ObjectType, relay
 from graphene.relay import Node
 from graphene_django import DjangoObjectType
 
-from links.models import LinkModel
-from users.schema import get_user_from_auth_token
+from links.models import LinkModel, VoteModel
+from users.schema import get_user_from_auth_token, User
+
+
+# ========== Vote ==========
+
+class Vote(DjangoObjectType):
+    class Meta:
+        model = VoteModel
+        interfaces = (relay.Node, )
+        use_connection = False
+
+
+class VoteConnection(relay.Connection):
+    class Meta:
+        node = Vote
+
+    count = graphene.Int()
+
+    def resolve_count(self, info, **args):
+        # self.iterable is the QuerySet of VoteModels
+        return self.iterable.count()
+
+    @staticmethod
+    def resolve_votes(parent, info, **args):
+        # parent is a LinkModel
+        qs = VoteModel.objects.filter(link_id=parent.pk)
+        return qs
+
+
+class CreateVote(relay.ClientIDMutation):
+    # mutation CreateVoteMutation($input: CreateVoteInput!) {
+    #   createVote(input: $input) {
+    #     vote {
+    #       id
+    #       link {
+    #         id
+    #         votes { count }
+    #       }
+    #       user { id }
+    #     }
+    #   }
+    # }
+    # example variables:
+    #   input {
+    #     userId: 'VXNlcjox',
+    #     linkId: 'TGluazoy',
+    #     clientMutationId: ''
+    #   }
+
+    vote = graphene.Field(Vote, required=True)
+
+    class Input:
+        user_id = graphene.ID()
+        link_id = graphene.ID(required=True)
+
+    @classmethod
+    def mutate_and_get_payload(cls, root, info, link_id, user_id, client_mutation_id=None):
+        user = get_user_from_auth_token(info.context) or None
+        if not user:
+            raise Exception('Only logged-in users may vote!')
+        if user_id:
+            user_from_id = Node.get_node_from_global_id(info, user_id)
+            if (not user_from_id) or (user_from_id.pk != user.pk):
+                raise Exception('Supplied user id does not match logged-in user!')
+        link = Node.get_node_from_global_id(info, link_id)
+        if not link:
+            raise Exception('Requested link not found!')
+        if VoteModel.objects.filter(user_id=user.pk, link_id=link.pk).count() > 0:
+            raise Exception('A vote already exists for this user and link!')
+
+        vote = VoteModel(user_id=user.pk, link_id=link.pk)
+        vote.save()
+
+        return CreateVote(vote=vote)
 
 
 # ========== Link ==========
@@ -41,6 +114,11 @@ class Link(DjangoObjectType):
         # different types with the same name in the schema: LinkConnection, LinkConnection."
         use_connection = False
 
+    votes = relay.ConnectionField(
+        VoteConnection,
+        resolver=VoteConnection.resolve_votes,
+        #**VoteConnection.get_votes_input_fields() -- no input fields (yet)
+    )
 
 class LinkOrderBy(graphene.Enum):
     """This provides the schema's LinkOrderBy Enum type, for ordering LinkConnection."""
@@ -159,3 +237,4 @@ class Query(object):
 
 class Mutation(object):
     create_link = CreateLink.Field()
+    create_vote = CreateVote.Field()

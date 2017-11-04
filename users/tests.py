@@ -45,9 +45,12 @@ def tearDownModule():
 
 # ========== utility function ==========
 
-def create_test_user():
-    user = UserModel(name='Test User', password='abc123', email='test@user.com')
-    user.save()
+def create_test_user(name=None, password=None, email=None):
+    user = UserModel.objects.create(
+        name=name or 'Test User',
+        password=password or 'abc123',
+        email=email or 'test@user.com'
+    )
     return user
 
 

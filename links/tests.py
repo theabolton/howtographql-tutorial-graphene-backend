@@ -28,7 +28,7 @@ from graphene.relay import Node
 
 from hackernews.schema import Mutation, Query
 from hackernews.utils import format_graphql_errors, quiet_graphql, unquiet_graphql
-from links.models import LinkModel
+from links.models import LinkModel, VoteModel
 from users.tests import create_test_user
 
 
@@ -462,4 +462,188 @@ class CreateLinkTests(TestCase):
                              msg='createLink should have failed: mismatched auth token and postedById')
         self.assertIn('postedById does not match user ID', repr(result.errors))
         expected = { 'createLink': None } # empty result
+        self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
+
+
+# ========== Vote query tests ==========
+
+class VotesOnLinkTests(TestCase):
+    def test_votes_count_on_link_test(self):
+        """test count field on votes field on Link type"""
+        # first link will have one vote, last link will have two
+        create_Link_orderBy_test_data() # creates more than one link
+        user = create_test_user()
+        first_link_id = None
+        for link in LinkModel.objects.all():
+            vote = VoteModel.objects.create(link_id=link.pk, user_id=user.pk)
+            # save these for below
+            first_link_id = first_link_id or link.pk
+            last_link_id = link.pk
+        user2 = create_test_user(name='Another User', password='zyz987', email='ano@user.com')
+        VoteModel.objects.create(link_id=last_link_id, user_id=user2.pk)
+        # check vote counts
+        first_link_gid = Node.to_global_id('Link', first_link_id)
+        last_link_gid = Node.to_global_id('Link', last_link_id)
+        query = '''
+          query VotesOnLinkTest($linkId: ID!) {
+            node(id: $linkId) {
+              ... on Link {
+                votes {
+                  count
+                }
+              }
+            }
+          }
+        '''
+        variables = {
+            'linkId': first_link_gid,
+        }
+        expected = {
+            'node': {
+              'votes': {
+                'count': 1,
+              }
+            }
+        }
+        schema = graphene.Schema(query=Query)
+        result = schema.execute(query, variable_values=variables)
+        self.assertIsNone(result.errors, msg=format_graphql_errors(result.errors))
+        self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
+        variables['linkId'] = last_link_gid
+        expected['node']['votes']['count'] = 2
+        result = schema.execute(query, variable_values=variables)
+        self.assertIsNone(result.errors, msg=format_graphql_errors(result.errors))
+        self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
+
+
+# ========== createVote mutation tests ==========
+
+class CreateVoteTests(TestCase):
+    def setUp(self):
+        create_Link_orderBy_test_data()
+        self.link_gid = Node.to_global_id('Link', LinkModel.objects.latest('created_at').pk)
+        self.user = create_test_user()
+        self.user_gid = Node.to_global_id('User', self.user.pk)
+        self.query = '''
+          mutation CreateVoteMutation($input: CreateVoteInput!) {
+            createVote(input: $input) {
+              vote {
+                link {
+                  id
+                  votes { count }
+                }
+              }
+            }
+          }
+        '''
+        self.schema = graphene.Schema(query=Query, mutation=Mutation)
+
+    @staticmethod
+    def variables(link_gid, user_gid):
+        return {
+          'input': {
+            'linkId': link_gid,
+            'userId': user_gid,
+          }
+        }
+
+    def context_with_token(self):
+        class Auth(object):
+            META = {'HTTP_AUTHORIZATION': 'Bearer {}'.format(self.user.token)}
+        return Auth
+
+    @staticmethod
+    def context_without_token():
+        class Auth(object):
+            META = {}
+        return Auth
+
+    def expected(self):
+        return {
+          'createVote': {
+            'vote': {
+              'link': {
+                'id': self.link_gid,
+                'votes': {
+                  'count': 1,
+                }
+              }
+            }
+          }
+        }
+
+    def test_create_vote(self):
+        """test normal vote creation, and that duplicate votes are not allowed"""
+        result = self.schema.execute(
+            self.query,
+            variable_values=self.variables(self.link_gid, self.user_gid),
+            context_value=self.context_with_token()
+        )
+        self.assertIsNone(result.errors, msg=format_graphql_errors(result.errors))
+        expected = self.expected()
+        self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
+        # verify that a second vote can't be created
+        result = self.schema.execute(self.query,
+                                     variable_values=self.variables(self.link_gid, self.user_gid),
+                                     context_value=self.context_with_token())
+        self.assertIsNotNone(result.errors,
+                             msg='createVote should have failed: duplicate votes not allowed')
+        self.assertIn('vote already exists', repr(result.errors))
+        expected['createVote'] = None
+        self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
+
+    def test_create_vote_not_logged(self):
+        """ensure createVote with no logged user fails"""
+        result = self.schema.execute(
+            self.query,
+            variable_values=self.variables(self.link_gid, self.user_gid),
+            context_value=self.context_without_token()
+        )
+        self.assertIsNotNone(result.errors,
+                             msg='createVote should have failed: no user logged-in')
+        self.assertIn('Only logged-in users may vote', repr(result.errors))
+        expected = { 'createVote': None }
+        self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
+
+    def test_create_vote_bad_userid(self):
+        """ensure invalid userId causes failure"""
+        result = self.schema.execute(
+            self.query,
+            variable_values=self.variables(self.link_gid, ' invalid base64 userId '),
+            context_value=self.context_with_token()
+        )
+        self.assertIsNotNone(result.errors,
+                             msg='createVote should have failed: invalid userId')
+        self.assertIn('user id does not match logged-in user', repr(result.errors))
+        expected = { 'createVote': None }
+        self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
+
+    def test_create_vote_user_mismatch(self):
+        """ensure logged user must match supplied userId"""
+        user2 = create_test_user(name='Another User', password='zyz987', email='ano@user.com')
+        user2_gid = Node.to_global_id('User', user2.pk)
+        result = self.schema.execute(
+            self.query,
+            variable_values=self.variables(self.link_gid, user2_gid),
+            context_value=self.context_with_token()
+        )
+        self.assertIsNotNone(result.errors,
+                             msg='createVote should have failed: userId and logged user mismatch')
+        self.assertIn('user id does not match logged-in user', repr(result.errors))
+        expected = { 'createVote': None }
+        self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
+
+    def test_create_vote_bad_link(self):
+        """ensure invalid linkId causes failuer"""
+        last_link_pk = LinkModel.objects.order_by('id').last().pk
+        invalid_link_gid = Node.to_global_id('Link', last_link_pk + 1)
+        result = self.schema.execute(
+            self.query,
+            variable_values=self.variables(invalid_link_gid, self.user_gid),
+            context_value=self.context_with_token()
+        )
+        self.assertIsNotNone(result.errors,
+                             msg='createVote should have failed: invalid linkId')
+        self.assertIn('link not found', repr(result.errors))
+        expected = { 'createVote': None }
         self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
