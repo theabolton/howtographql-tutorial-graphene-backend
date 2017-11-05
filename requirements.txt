@@ -2,6 +2,7 @@
 
 # These were installed by 'pip install django django-filter'
 Django==1.11.7
+django-filter==1.1.0
 pytz==2017.3
 
 # These were installed by 'pip install graphene graphene-django'

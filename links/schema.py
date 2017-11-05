@@ -21,6 +21,8 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import django_filters
+
 import graphene
 from graphene import ObjectType, relay
 from graphene.relay import Node
@@ -39,11 +41,50 @@ class Vote(DjangoObjectType):
         use_connection = False
 
 
+class IdInput(graphene.InputObjectType):
+    id = graphene.ID(required=True)
+
+
+class VoteFilter(graphene.InputObjectType):
+    link = graphene.InputField(IdInput)
+    user = graphene.InputField(IdInput)
+
+
+class VotesFilterSet(django_filters.FilterSet):
+    class Meta:
+        model = VoteModel
+        fields = ['link', 'user']
+
+
 class VoteConnection(relay.Connection):
     class Meta:
         node = Vote
 
     count = graphene.Int()
+
+    @staticmethod
+    def get_all_votes_input_fields():
+        return {
+            'filter': graphene.Argument(VoteFilter),
+        }
+
+    @staticmethod
+    def resolve_all_votes(_, info, filter=None):
+        qs = VoteModel.objects.all()
+        if filter:
+            # We don't get the free input marshalling that DjangoFilterConnectionField provides, so
+            # we have to do that ourselves.
+            for key, field in filter.items():
+                # collapse e.g.:
+                #     { 'link': { 'id': '<global_id>' } }  # what graphene provides
+                # to:
+                #     { 'link': '<primary_key>' }  # what our FilterSet expects
+                if key in ('link', 'user'):
+                    id = field.get('id', None)
+                    if id:
+                        _, filter[key] = Node.from_global_id(id)
+            qs = VotesFilterSet(data=filter, queryset=qs).qs
+        return qs
 
     def resolve_count(self, info, **args):
         # self.iterable is the QuerySet of VoteModels
@@ -149,7 +190,7 @@ class LinkConnection(relay.Connection):
         node = Link
 
     @staticmethod
-    def get_input_fields():
+    def get_all_links_input_fields():
         return {
             'order_by': graphene.Argument(LinkOrderBy) # an input field using the custom enum
         }
@@ -223,7 +264,13 @@ class Viewer(ObjectType):
     all_links = relay.ConnectionField(
         LinkConnection,
         resolver=LinkConnection.resolve_all_links,
-        **LinkConnection.get_input_fields()
+        **LinkConnection.get_all_links_input_fields()
+    )
+
+    all_votes = relay.ConnectionField(
+        VoteConnection,
+        resolver=VoteConnection.resolve_all_votes,
+        **VoteConnection.get_all_votes_input_fields()
     )
 
 

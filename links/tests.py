@@ -117,6 +117,14 @@ class ViewerTests(TestCase):
                             'ofType': None,
                         }
                     },
+                    {
+                        'name': 'allVotes',
+                        'type': {
+                            'name': 'VoteConnection',
+                            'kind': 'OBJECT',
+                            'ofType': None,
+                        }
+                    },
                 ]
             }
         }
@@ -124,7 +132,7 @@ class ViewerTests(TestCase):
         result = schema.execute(query)
         self.assertIsNone(result.errors, msg=format_graphql_errors(result.errors))
         # Check that the fields we need are there, but don't fail on extra fields.
-        NEEDED_FIELDS = ('id', 'allLinks')
+        NEEDED_FIELDS = ('id', 'allLinks', 'allVotes')
         result.data['__type']['fields'] = list(filter(
             lambda f: f['name'] in NEEDED_FIELDS,
             result.data['__type']['fields']
@@ -511,6 +519,66 @@ class VotesOnLinkTests(TestCase):
         self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
         variables['linkId'] = last_link_gid
         expected['node']['votes']['count'] = 2
+        result = schema.execute(query, variable_values=variables)
+        self.assertIsNone(result.errors, msg=format_graphql_errors(result.errors))
+        self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
+
+
+class AdHocCheckVoteQueryTests(TestCase):
+    def test_ad_hoc_check_vote_query(self):
+        """As of 11/4/2017, the tutorial contains an query done outside Relay, to check whether a
+        vote already exists. (On the client side? Really? Ask forgiveness rather than permisson,
+        and save a round trip.) The query is done using a private API function
+        (relay.environment._network.fetch) that, sure enough, went away in recent versions of Relay.
+        Test that that query works (for older Relay versions, and in the event the tutorial is fixed
+        for newer versions.)
+        """
+        create_Link_orderBy_test_data() # creates more than one link
+        user = create_test_user()
+        user_gid = Node.to_global_id('User', user.pk)
+        user2 = create_test_user(name='Another User', password='zyz987', email='ano@user.com')
+        # create multiple votes
+        for link in LinkModel.objects.all():
+            last_vote = VoteModel.objects.create(link_id=link.pk, user_id=user.pk)
+            VoteModel.objects.create(link_id=link.pk, user_id=user2.pk)
+            last_link = link
+        link_gid = Node.to_global_id('Link', last_link.pk)
+        vote_gid = Node.to_global_id('Vote', last_vote.pk)
+        # make sure the query only returns one vote
+        query = '''
+          query CheckVoteQuery($userId: ID!, $linkId: ID!) {
+            viewer {
+              allVotes(filter: {
+                user: { id: $userId },
+                link: { id: $linkId }
+              }) {
+                edges {
+                  node {
+                    id
+                  }
+                }
+              }
+            }
+          }
+        '''
+        variables = {
+            'userId': user_gid,
+            'linkId': link_gid,
+        }
+        expected = {
+            'viewer': {
+                'allVotes': {
+                    'edges': [
+                        {
+                            'node': {
+                                'id': vote_gid,
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+        schema = graphene.Schema(query=Query)
         result = schema.execute(query, variable_values=variables)
         self.assertIsNone(result.errors, msg=format_graphql_errors(result.errors))
         self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
