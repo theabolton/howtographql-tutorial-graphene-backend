@@ -95,9 +95,10 @@ class VoteConnection(relay.Connection):
         }
 
     @staticmethod
-    def resolve_all_votes(_, info, filter=None):
+    def resolve_all_votes(_, info, **args):
         """Resolve a field returning a (possibly filtered view of) all Votes."""
         qs = VoteModel.objects.all()
+        filter = args.get('filter', None)
         if filter:
             # We don't get the free input marshalling that DjangoFilterConnectionField provides, so
             # we have to do that ourselves.
@@ -238,8 +239,9 @@ class LinkConnection(relay.Connection):
             'order_by': graphene.Argument(LinkOrderBy)
         }
 
-    def resolve_all_links(self, info, order_by):
+    def resolve_all_links(self, info, **args):
         qs = LinkModel.objects.all()
+        order_by = args.get('order_by', None)
         if order_by:
             # Graphene has already translated the over-the-wire enum value (e.g. 'createdAt_DESC')
             # to our internal value ('-created_at') needed by Django.
