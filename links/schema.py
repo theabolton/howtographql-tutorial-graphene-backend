@@ -84,6 +84,13 @@ class VoteConnection(relay.Connection):
 
     count = graphene.Int()
 
+    def resolve_count(self, info, **args):
+        """Return the count of votes in the VoteConnection query."""
+        # self.iterable is the QuerySet of VoteModels
+        return self.iterable.count()
+
+    # -------- Vote-related resolvers used by other classes --------
+
     # 'allVotes' is actually a field on Viewer, and 'votes' is a field on Link, but rather than put
     # a bunch of Vote-related logic in Viewer and Link, I prefer to keep it here as static methods
     # on VoteConnection.
@@ -113,11 +120,6 @@ class VoteConnection(relay.Connection):
                         _, filter[key] = Node.from_global_id(id)
             qs = VotesFilterSet(data=filter, queryset=qs).qs
         return qs
-
-    def resolve_count(self, info, **args):
-        """Return the count of votes in the LinkConnection query."""
-        # self.iterable is the QuerySet of VoteModels
-        return self.iterable.count()
 
     @staticmethod
     def resolve_votes(parent, info, **args):
