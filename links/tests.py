@@ -140,6 +140,65 @@ class ViewerTests(TestCase):
         assert result.data == expected, '\n'+repr(expected)+'\n'+repr(result.data)
 
 
+# ========== Relay Node tests ==========
+
+class RelayNodeTests(TestCase):
+    """Test that model nodes can be retreived via the Relay Node interface."""
+    def test_node_for_link(self):
+        link = LinkModel.objects.create(description='Test', url='http://a.com')
+        link_gid = Node.to_global_id('Link', link.pk)
+        query = '''
+          query {
+            node(id: "%s") {
+              id
+              ...on Link {
+                url
+              }
+            }
+          }
+        ''' % link_gid
+        expected = {
+          'node': {
+            'id': link_gid,
+            'url': 'http://a.com',
+          }
+        }
+        schema = graphene.Schema(query=Query)
+        result = schema.execute(query)
+        self.assertIsNone(result.errors, msg=format_graphql_errors(result.errors))
+        self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
+
+    def test_node_for_vote(self):
+        link = LinkModel.objects.create(description='Test', url='http://a.com')
+        user = create_test_user()
+        vote = VoteModel.objects.create(link_id=link.pk, user_id=user.pk)
+        vote_gid = Node.to_global_id('Vote', vote.pk)
+        query = '''
+          query {
+            node(id: "%s") {
+              id
+              ...on Vote {
+                link {
+                  url
+                }
+              }
+            }
+          }
+        ''' % vote_gid
+        expected = {
+          'node': {
+            'id': vote_gid,
+            'link': {
+              'url': 'http://a.com',
+            }
+          }
+        }
+        schema = graphene.Schema(query=Query)
+        result = schema.execute(query)
+        self.assertIsNone(result.errors, msg=format_graphql_errors(result.errors))
+        self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
+
+
 # ========== allLinks query tests ==========
 
 def create_Link_orderBy_test_data():

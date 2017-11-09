@@ -24,6 +24,7 @@
 from django.test import TestCase
 
 import graphene
+from graphene.relay import Node
 
 from hackernews.schema import Mutation, Query
 from hackernews.utils import format_graphql_errors, quiet_graphql, unquiet_graphql
@@ -101,6 +102,35 @@ class GetUserTests(TestCase):
             META = {'HTTP_AUTHORIZATION': 'Bearer AbDbAbDbAbDbA'}
         with self.assertRaises(Exception):
             get_user_from_auth_token(AuthWrong)
+
+
+# ========== Relay Node tests ==========
+
+class RelayNodeTests(TestCase):
+    """Test that model nodes can be retreived via the Relay Node interface."""
+    def test_node_for_user(self):
+        user = create_test_user()
+        user_gid = Node.to_global_id('User', user.pk)
+        query = '''
+          query {
+            node(id: "%s") {
+              id
+              ...on User {
+                name
+              }
+            }
+          }
+        ''' % user_gid
+        expected = {
+          'node': {
+            'id': user_gid,
+            'name': user.name,
+          }
+        }
+        schema = graphene.Schema(query=Query)
+        result = schema.execute(query)
+        self.assertIsNone(result.errors, msg=format_graphql_errors(result.errors))
+        self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
 
 
 # ========== createUser mutation tests ==========
