@@ -1,0 +1,9 @@
+language: python
+python:
+  - "3.6"
+before_install:
+  - sudo apt-get update -qq
+install:
+  - pip install -q -r requirements.txt
+script:
+  - python manage.py makemigrations && python manage.py test
