@@ -40,7 +40,7 @@ interested in this project if:
 * You're looking for examples of how to use Graphene 2.0. (The backend tutorial is written for
   pre-2.0 Graphene.)
 
-.. warning::
+**Warning**
 
    The GraphQL ecosystem is rapidly evolving, and at this time (November 2017), the newly-released
    Graphene 2.0 is a bit of a mess. While Graphene holds lots of promise, be aware that it currently
