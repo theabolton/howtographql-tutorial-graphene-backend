@@ -405,6 +405,7 @@ class CreateLinkBasicTest(TestCase):
                 url
                 description
               }
+              clientMutationId
             }
           }
         '''
@@ -412,6 +413,7 @@ class CreateLinkBasicTest(TestCase):
             'input': {
                 'description': 'Description',
                 'url': 'http://example.com',
+                'clientMutationId': 'give_this_back_to_me',
             }
         }
         class Context(object):
@@ -421,7 +423,8 @@ class CreateLinkBasicTest(TestCase):
                 'link': {
                     'description': 'Description',
                     'url': 'http://example.com',
-                }
+                },
+                'clientMutationId': 'give_this_back_to_me',
             }
         }
         schema = graphene.Schema(query=Query, mutation=Mutation)
@@ -448,6 +451,7 @@ class CreateLinkTests(TestCase):
                   id
                 }
               }
+              clientMutationId
             }
           }
         '''
@@ -459,6 +463,7 @@ class CreateLinkTests(TestCase):
           'input': {
             'description': 'Description',
             'url': 'http://example.com',
+            'clientMutationId': 'give_this_back_to_me',
           }
         }
         if gid:
@@ -483,7 +488,8 @@ class CreateLinkTests(TestCase):
               'description': 'Description',
               'url': 'http://example.com',
               'postedBy': with_id and { 'id': self.user_gid } or None
-            }
+            },
+            'clientMutationId': 'give_this_back_to_me',
           }
         }
 
@@ -660,6 +666,7 @@ class CreateVoteTests(TestCase):
                   votes { count }
                 }
               }
+              clientMutationId
             }
           }
         '''
@@ -671,6 +678,7 @@ class CreateVoteTests(TestCase):
           'input': {
             'linkId': link_gid,
             'userId': user_gid,
+            'clientMutationId': 'give_this_back_to_me',
           }
         }
 
@@ -695,7 +703,8 @@ class CreateVoteTests(TestCase):
                   'count': 1,
                 }
               }
-            }
+            },
+            'clientMutationId': 'give_this_back_to_me',
           }
         }
 

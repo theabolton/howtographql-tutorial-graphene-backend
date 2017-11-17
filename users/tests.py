@@ -141,6 +141,7 @@ class CreateUserTests(TestCase):
           mutation CreateUserMutation($createUserInput: SignupUserInput!) {
             createUser(input: $createUserInput) {
               user { name }
+              clientMutationId
             }
           }
         '''
@@ -153,13 +154,15 @@ class CreateUserTests(TestCase):
                         'password': 'abc123',
                     }
                 },
+                'clientMutationId': 'give_this_back_to_me',
             }
         }
         self.expected = {
             'createUser': {
                 'user': {
                     'name': 'Jim Kirk',
-                }
+                },
+                'clientMutationId': 'give_this_back_to_me',
             }
         }
         self.schema = graphene.Schema(query=Query, mutation=Mutation)
@@ -206,6 +209,7 @@ class SigninUserTests(TestCase):
             signinUser(input: $signinUserInput) {
               token
               user { name }
+              clientMutationId
             }
           }
         '''
@@ -218,7 +222,8 @@ class SigninUserTests(TestCase):
                 'email': {
                     'email': self.user.email,
                     'password': self.user.password,
-                }
+                },
+                'clientMutationId': 'give_this_back_to_me',
             }
         }
         expected = {
@@ -226,7 +231,8 @@ class SigninUserTests(TestCase):
                 'token': 'REDACTED',
                 'user': {
                     'name': self.user.name,
-                }
+                },
+                'clientMutationId': 'give_this_back_to_me',
             }
         }
         result = self.schema.execute(self.query, variable_values=variables)
