@@ -329,6 +329,14 @@ class Viewer(ObjectType):
         **VoteConnection.get_all_votes_input_fields()
     )
 
+    instance = None # a lazily-initialized singleton for get_node()
+
+    @classmethod
+    def get_node(cls, info, id):
+        if cls.instance is None:
+            cls.instance = Viewer()
+        return cls.instance
+
 
 class Query(object):
     viewer = graphene.Field(Viewer)

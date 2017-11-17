@@ -198,6 +198,34 @@ class RelayNodeTests(TestCase):
         self.assertIsNone(result.errors, msg=format_graphql_errors(result.errors))
         self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
 
+    def test_node_for_viewer(self):
+        query = '''
+          query {
+            viewer {
+              id
+            }
+          }
+        '''
+        schema = graphene.Schema(query=Query)
+        result = schema.execute(query)
+        self.assertIsNone(result.errors, msg=format_graphql_errors(result.errors))
+        viewer_gid = result.data['viewer']['id']
+        query = '''
+          query {
+            node(id: "%s") {
+              id
+            }
+          }
+        ''' % viewer_gid
+        expected = {
+          'node': {
+            'id': viewer_gid,
+          }
+        }
+        result = schema.execute(query)
+        self.assertIsNone(result.errors, msg=format_graphql_errors(result.errors))
+        self.assertEqual(result.data, expected, msg='\n'+repr(expected)+'\n'+repr(result.data))
+
 
 # ========== allLinks query tests ==========
 
